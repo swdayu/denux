@@ -2,16 +2,17 @@
 ========
 
 1. `系统调用简介`_
-2. `使用中断调用`_
-3. `32位快速调用`_
-4. `64位快速调用`_
-5. `syscall库函数`_
-6. `虚拟系统调用`_
-7. `glibc包装函数`_
-8. `系统调用约定`_
-9. `系统调用列表`_
-10. `32位系统调用编号`_
-11. `64位系统调用编号`_
+2. `INT80中断调用`_
+3. `中断向量表`_
+4. `32位快速调用`_
+5. `64位快速调用`_
+6. `syscall库函数`_
+7. `虚拟系统调用`_
+8. `glibc包装函数`_
+9. `系统调用约定`_
+10. `系统调用列表`_
+11. `32位系统调用编号`_
+12. `64位系统调用编号`_
 
 参考链接：
 
@@ -50,8 +51,8 @@ Ring 0。用户程序在较低的级别运行，通常是 Ring 3。为了执行�
 更特权级别（从 Ring 3 变为 Ring 0），以便内核执行。有几种方法可以导致特权级别变更并触
 发内核执行某些操作。
 
-使用中断调用
-------------
+INT80中断调用
+--------------
 
 ::
 
@@ -224,6 +225,152 @@ arch/x86/include/asm/irqflags.h 中定义为 iretq。 ::
 
     irq_return:
         INTERRUPT_RETURN
+
+中断向量表
+-----------
+
+中断向量表相关描述位于以下文件或类似的位置：arch\x86\include\asm\irq_vectors.h。
+Linux 中断向量布局，共有 256 个可以由 Linux 定义的中断描述表（IDT，Interrupt
+Descriptor Table）条目，每个 CPU 都有并且每个条目 8 字节。当给定的向量被触发时，无论
+是由 CPU 外部、CPU 内部还是软件触发的事件，CPU 都会使用它们作为跳转表。
+
+Linux 在启动初期就设置了每个条目跳转到的内核代码地址，并且永远不会更改它们。这是 IDT
+条目的通用布局：
+
+* 向量 0 ~ 31：系统陷阱和异常 —— 硬编码事件
+* 向量 32 ~ 127：设备中断
+* 向量 128：遗留 int80 系统调用接口
+* 向量 129 ~ FIRST_SYSTEM_VECTOR-1：设备中断
+* 向量 FIRST_SYSTEM_VECTOR ~ 255：特殊中断
+
+64 位 x86 每个 CPU 都有自己的 IDT 表，32 位则有一个共享的 IDT 表。本文件
+（irq_vectors.h）列举了它们的确切布局： ::
+
+    #define NMI_VECTOR      0x02 // 当编程 APIC 时，这被用作一个中断向量
+    #define NR_IRQS_LEGACY  16
+
+    // 可用于外部中断源的 IDT 向量从 0x20 开始，0x80 是系统调用向量，0x30-0x3f 用于
+    // ISA 中断。ISA 中断是指与 ISA 总线（Industry Standard Architecture）相关的中
+    // 断。ISA 总线是一种早期的计算机硬件总线标准，主要用于连接各种硬件设备，如声卡、
+    // 网卡、硬盘控制器等。
+    #define FIRST_EXTERNAL_VECTOR   0x20
+    #define ISA_IRQ_VECTOR(irq) (((FIRST_EXTERNAL_VECTOR + 16) & ~15) + irq)
+    #define IA32_SYSCALL_VECTOR     0x80
+    #ifdef CONFIG_X86_32
+    #define SYSCALL_VECTOR          0x80
+    #endif
+
+    // 被对称多处理器（SMP，Symmetric Multi-Processing）架构使用的特殊 IRQ 向量，范
+    // 围 0xf0-0xff。以下部分向量是 “罕见” 的，它们被合并到一个单独的向量
+    // CALL_FUNCTION_VECTOR 中，以节省向量空间。TLB、重新调度和本地 APIC 向量对性能
+    // 至关重要。
+    #define SPURIOUS_APIC_VECTOR        0xff
+    #if ((SPURIOUS_APIC_VECTOR & 0x0F) != 0x0F)
+    # error SPURIOUS_APIC_VECTOR definition error
+    #endif
+    #define ERROR_APIC_VECTOR           0xfe
+    #define RESCHEDULE_VECTOR           0xfd
+    #define CALL_FUNCTION_VECTOR        0xfc
+    #define CALL_FUNCTION_SINGLE_VECTOR 0xfb
+    #define THERMAL_APIC_VECTOR         0xfa
+    #define THRESHOLD_APIC_VECTOR       0xf9
+    #define REBOOT_VECTOR               0xf8
+
+    // 发送给主机内核的所有设备消息信号中断（MSI，Message Signaled Interrupts）的中
+    // 断通知向量。
+    #define POSTED_MSI_NOTIFICATION_VECTOR 0xeb
+    #define NR_VECTORS 256
+    #ifdef CONFIG_X86_LOCAL_APIC
+    #define FIRST_SYSTEM_VECTOR POSTED_MSI_NOTIFICATION_VECTOR
+    #else
+    #define FIRST_SYSTEM_VECTOR NR_VECTORS
+    #endif
+    #define NR_EXTERNAL_VECTORS (FIRST_SYSTEM_VECTOR - FIRST_EXTERNAL_VECTOR)
+    #define NR_SYSTEM_VECTORS (NR_VECTORS - FIRST_SYSTEM_VECTOR)
+
+**X86硬编码中断**
+
+X86 前 32 个硬编码中断，定义在该文件或相似文件中 arch\x86\include\asm\trapnr.h。其中
+NMI（Non-Maskable Interrupt）是不可屏蔽中断。它是一种特殊的硬件中断，不能被普通的中断
+屏蔽位（如 CPU 的中断标志位）屏蔽。NMI 通常用于处理一些紧急情况，例如硬件错误、系统故障
+或调试目的。 ::
+
+    // FRED、Intel VT-x 和 AMD SVM 使用的事件类型代码
+    #define EVENT_TYPE_EXTINT       0   // 外部中断
+    #define EVENT_TYPE_RESERVED     1   // 保留
+    #define EVENT_TYPE_NMI          2   // NMI
+    #define EVENT_TYPE_HWEXC        3   // 硬件来源的陷阱、异常
+    #define EVENT_TYPE_SWINT        4   // INT n
+    #define EVENT_TYPE_PRIV_SWEXC   5   // INT1
+    #define EVENT_TYPE_SWEXC        6   // INTO、INT3
+    #define EVENT_TYPE_OTHER        7   // FRED SYSCALL/SYSENTER，VT-x MTF
+
+    // 中断或异常
+    #define X86_TRAP_DE         0   // 除零异常（Divide by zero）
+    #define X86_TRAP_DB         1   // 调试异常（Debug）INT1 产生 DB trap
+    #define X86_TRAP_NMI        2   // 非屏蔽中断（Non-maskable interrupt）
+    #define X86_TRAP_BP         3   // 断点异常（Breakpoint）INT3 产生 BP trap
+    #define X86_TRAP_OF         4   // 溢出异常（Overflow）INTO 如果OF为1产生中断
+    #define X86_TRAP_BR         5   // 超出范围异常（Bound range Exceeded）
+    #define X86_TRAP_UD         6   // 无效操作码（Invalid Opcode）
+    #define X86_TRAP_NM         7   // 设备不可用（Device Not Available）
+    #define X86_TRAP_DF         8   // 双重故障（Double Fault）
+    #define X86_TRAP_OLD_MF     9   // 协处理器段超限（Coprocessor Seg Overrun）
+    #define X86_TRAP_TS         10  // 无效任务状态段（Invalid TSS）
+    #define X86_TRAP_NP         11  // 段不存在（Segment Not Present）
+    #define X86_TRAP_SS         12  // 堆栈段异常（Stack Segment Fault）
+    #define X86_TRAP_GP         13  // 通用保护异常（General Protection Fault）
+    #define X86_TRAP_PF         14  // 页面错误（Page Fault）
+    #define X86_TRAP_SPURIOUS   15  // 伪中断（Spurious Interrupt），Intel 保留
+    #define X86_TRAP_MF         16  // x87 浮点异常（x87 FP Exception）
+    #define X86_TRAP_AC         17  // 对齐检查（Alignment Check）
+    #define X86_TRAP_MC         18  // 机器检查（Machine Check）
+    #define X86_TRAP_XF         19  // SIMD 浮点异常（SIMD FP Expiton）
+    #define X86_TRAP_VE         20  // 虚拟化异常（Virtualization Exception）
+    #define X86_TRAP_CP         21  // 控制保护异常（Control Protection Except.）
+    #define X86_TRAP_VC         29  // VMM 通信异常（VMM Communication Except.）
+    #define X86_TRAP_IRET       32  // IRET 异常（IRET Exception）
+                                    // 22 ~ 31 Intel 保留，不要使用
+
+INT n、INTO、INT3 和 BOUND 指令允许程序或任务显式调用中断或异常处理程序。INT n 指令使
+用向量作为参数，允许程序调用任何中断处理程序。INTO 指令如果 EFLAGS 寄存器中的溢出标志
+（OF）被设置，则显式调用溢出异常（#OF）处理程序。OF 标志表示算术指令的溢出，但它不会自
+动引发溢出异常。只有通过以下两种方式之一，才能显式引发溢出异常：执行 INTO 指令；检查 OF
+标志，并在标志被设置时，使用参数 4（溢出异常的向量）执行 INT n 指令。这两种处理溢出条件
+的方法都允许程序在指令流的特定位置检测溢出。
+
+INT3 指令显式调用断点异常（#BP）处理程序。类似地，INT1 指令（操作码 F1）显式调用调试异
+常（#DB）处理程序。BOUND 指令如果发现操作数不在内存中预定义的边界内，则显式调用超出范围
+异常（#BR）处理程序。这条指令用于检查对数组和其他数据结构的引用。与溢出异常类似，超出范
+围异常只能通过 BOUND 指令或使用参数 5（边界检查异常的向量）的 INT n 指令显式引发。处理
+器不会隐式地执行边界检查并引发超出范围异常。
+
+**异常分类**
+
+异常根据报告方式以及导致异常的指令是否可以在不丢失程序或任务连续性的情况下重新启动，被分
+类为故障（faults）、陷阱（traps）或中止（aborts）。
+
+* 故障（Faults）
+
+  故障是一种通常可以纠正的异常，一旦纠正后，允许程序重新启动而不会丢失连续性。当报告
+  故障时，处理器将机器状态恢复到执行故障指令之前的状态。故障处理程序的返回地址（保存
+  的 CS 和 EIP 寄存器的内容）指向故障指令，而不是故障指令之后的指令。
+
+* 陷阱（Traps）
+
+  陷阱是在执行陷阱指令后立即报告的异常。陷阱允许程序或任务在不丢失程序连续性的情况下
+  继续执行。陷阱处理程序的返回地址指向陷阱指令之后要执行的指令。
+
+* 中止（Aborts）
+
+  中止不总是能精确报告导致异常的指令发生的位置，且不允许重新启动发生异常的程序或任
+  务。中止用于报告严重错误，如硬件错误以及系统表中的不一致或非法值。
+
+故障（Faults）异常的一个异常子集是不可重新启动的异常，这类异常会导致丢失部分处理器状
+态。例如，执行一个跨越栈段末尾的栈帧 POPAD 指令，会导致报告故障。在这种情况下，异常处理
+程序会看到指令指针（CS:EIP）已恢复，就好像 POPAD 指令未被执行一样。然而，内部处理器状
+态（通用寄存器）将被修改。这类情况被视为编程错误。导致此类异常的应用程序应由操作系统终
+止。
 
 32位快速调用
 ------------

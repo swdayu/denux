@@ -3,7 +3,7 @@ LINUX系统开发文档
 1. `编译选项 <a-gcc-cmd-opt.rst>`_
 2. `辅助工具 <b-gnu-utils-cmd.rst>`_
 3. `语言扩展 <c-gnu-extension.rst>`_
-4. `系统调用 <d-system-call.rst>`_
+4. `系统调用 <d-system-calls.rst>`_
 
 参考链接
 
