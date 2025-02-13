@@ -4,6 +4,7 @@ LINUX系统开发文档
 2. `辅助工具 <b-gnu-utils-cmd.rst>`_
 3. `语言扩展 <c-gnu-extension.rst>`_
 4. `系统调用 <d-system-calls.rst>`_
+5. `调用约定 <e-call-convention.rst>`_
 
 参考链接
 
