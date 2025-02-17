@@ -1630,6 +1630,17 @@ C++ 源文件通常使用以下后缀之一：.C、.cc、.cpp、.CPP、.c++、.c
     -fdiagnostics-escape-format=[unicode|bytes]
     -fdiagnostics-text-art-charset=[none|ascii|unicode|emoji]
 
+传统上，诊断消息的格式设置并未考虑输出设备的特性（例如其宽度等）。你可以使用下面介绍的选
+项来控制诊断消息的格式设置算法，例如每行显示多少个字符、源位置信息应多久报告一次。请注
+意，某些语言前端可能不会遵循这些选项。
+
+**-fmessage-length=n** ::
+
+    尝试对错误消息进行格式设置，使其每行大约包含 n 个字符。如果 n 为零，则不进行换行处
+    理；每条错误消息将显示在单独的一行上。这是所有前端的默认设置。注意此选项还会影响
+    #error 和 #warning 预处理指令以及 deprecated 函数/类型/变量属性的显示。不过，它
+    不会影响 pragma GCC warning 和 pragma GCC error 编译指示。
+
 警告选项
 ---------
 
@@ -1639,6 +1650,11 @@ C++ 源文件通常使用以下后缀之一：.C、.cc、.cpp、.CPP、.c++、.c
     -w -Werror -Werror= -Wno-error= -Wfatal-errors
     -Wpedantic -pedantic -pedantic-errors -fpermissive
     -Wall -Wextra -Wabi=n
+    -Wdate-time -Wtrigraphs
+    -Wlogical-op -Wlogical-not-parentheses
+    -Wno-implicit-int -Wno-implicit-function-declaration -Wimplicit
+    -Wimplicit-fallthrough -Wimplicit-fallthrough=n
+    -Wfloat-conversion -Wdouble-promotion
 
     -Wall 控制的选项：
 
@@ -1968,6 +1984,88 @@ pragma 在代码中启用或禁用的选项，就像它们出现在命令行的�
       };
       现在，联合体 U 始终在内存中传递而不是寄存器。
 
+**-Wdate-time** ::
+
+    当编译器遇到 __TIME__、__DATE__ 或 __TIMESTAMP__ 这些宏时会发出警告。原因在于这
+    些宏可能会妨碍实现逐位相同的可重复编译。
+
+**-Wtrigraphs** ::
+
+    如果遇到任何可能改变程序含义的三字符组，则发出警告。注释中的三字符组不会被警告，除
+    非它们会形成转义换行符。此选项会由 -Wall 选项隐式启用。如果未指定 -Wall，则此选项
+    仍然会被启用，除非启用了三字符组。若要在不发出警告的情况下进行三字符组转换，同时又
+    获得 -Wall 提供的其他警告，请使用 -trigraphs -Wall -Wno-trigraphs。
+
+**-Wlogical-op** ::
+
+    对表达式中可疑的逻辑运算符使用情况发出警告。这包括在可能期望使用按位运算符的上下文
+    中使用逻辑运算符的情况。当逻辑运算符的操作数相同时也会发出警告，例如：
+
+    extern int a;
+    if (a < 0 && a < 0) { ... }
+
+**-Wlogical-not-parentheses** ::
+
+    对在比较运算的左操作数上使用逻辑非运算符的情况发出警告。如果右操作数被认为是布尔表
+    达式，则此选项不会发出警告。其目的是检测类似以下的可疑代码：
+
+    int a;
+    ...
+    if (!a > 1) { ... }
+
+    可以通过将左操作数用括号括起来来消除此警告，例如：
+
+    if ((!a) > 1) { ... }
+
+    此警告会由 -Wall 选项启用。
+
+**-Wno-implicit-int（仅适用于 C 和 Objective - C）** ::
+
+    此选项用于控制在声明未指定类型时的警告。在 C99 及后续版本的 C 语言方言中，以及使用
+    -Wall 选项时，此警告默认作为错误启用。可以使用 -fpermissive（连同某些其他错误一起
+    处理）将该错误降级为警告，或者仅针对此错误使用 -Wno-error=implicit-int 来将其降级
+    为警告。使用 -pedantic-errors 选项会将此警告升级为错误。
+
+**-Wno-implicit-function-declaration（仅适用于 C 和 Objective - C）** ::
+
+    此选项用于控制在函数使用前未进行声明时的警告。在 C99 及后续版本的 C 语言方言中，以
+    及使用 -Wall 选项时，此警告默认作为错误启用。可以使用 -fpermissive（连同某些其他
+    错误一起处理）将该错误降级为警告，或者仅针对此错误使用
+    -Wno-error=implicit-function-declaration 来将其降级为警告。使用
+    -pedantic-errors 选项会将此警告升级为错误。
+
+**-Wimplicit（仅适用于 C 和 Objective - C）** ::
+
+    此选项与 -Wimplicit-int 和 -Wimplicit-function-declaration 作用相同。使用
+    -Wall 选项时会启用此警告。 
+
+**-Wimplicit-fallthrough -Wimplicit-fallthrough=n** ::
+
+    当 switch 语句中的 case 分支出现贯穿（fallthrough）情况时发出警告。
+    -Wimplicit-fallthrough 等同于 -Wimplicit-fallthrough=3，而
+    -Wno-implicit-fallthrough 等同于 -Wimplicit-fallthrough=0。
+    -Wimplicit-fallthrough=3 被 -Wextra 自动开启。
+
+**-Wfloat-conversion** ::
+
+    对会降低实数值精度的隐式转换发出警告。这包括从实数类型转换为整数类型，以及从高精度
+    实数类型转换为低精度实数类型的情况。此选项也会由 -Wconversion 选项启用。
+
+**-Wdouble-promotion（仅适用于 C、C++、Objective-C 和 Objective-C++）** ::
+
+    当 float 类型的值被隐式提升为 double 类型时发出警告。具有32位“单精度”浮点运算单元
+    的 CPU 会用硬件实现 float 类型的运算，但用软件模拟 double 类型的运算。在这样的机
+    器上，使用 double 类型的值进行计算的代价要高得多，因为软件模拟会带来额外的开销。
+
+    由于浮点字面量默认是 double 类型，因此很容易在不经意间使用 double 类型进行计算。例
+    如，在下面的代码中：
+
+    float area(float radius) {
+        return 3.14159 * radius * radius;
+    }
+
+    编译器会使用 double 类型进行整个计算，因为浮点字面量 3.14159 是 double 类型。
+
 静态分析选项
 ------------
 
@@ -2182,6 +2280,14 @@ GCC 允许你将 -g 与 -O 一起使用。优化代码所采取的策略有时�
     -fauto-profile -fauto-profile=path
     -fbranch-probabilities
     --param name=value
+    -ffunction-sections -fdata-sections
+    -faggressive-loop-optimizations
+    -ftree-loop-distribute-patterns
+    -fdelete-null-pointer-checks
+    -fisolate-erroneous-paths-dereference
+    -fisolate-erroneous-paths-attribute
+    -fstrict-aliasing -fipa-strict-aliasing
+    -fsingle-precision-constant
 
     -O 或 -O1 控制的选项：
 
@@ -2318,7 +2424,10 @@ GCC 允许你将 -g 与 -O 一起使用。优化代码所采取的策略有时�
 
     进一步优化。GCC 启用几乎所有不涉及空间和速度权衡的优化。与 -O 相比，此选项增加了编
     译时间和提升了生成代码的性能。-O2 启用了 -O1 指定的所有优化标志。请注意在使用了计
-    算跳转（computed goto）的程序上启用 -O2 情况下的关于 -fgcse 的警告。
+    算跳转（computed goto）的程序上启用 -O2 情况下的关于 -fgcse 的警告。当使用 -O2 
+    优化选项对包含计算式 goto 语句的程序进行编译时，-O2 中启用的某些优化可能会与计算式 
+    goto 语句产生冲突，进而导致代码的行为不符合预期，甚至可能引发未定义行为。所以编译器
+    会在 -fgcse 选项下给出相应的警告。
 
 **-O3** ::
 
@@ -2602,6 +2711,167 @@ GCC 允许你将 -g 与 -O 一起使用。优化代码所采取的策略有时�
     义与编译器的内部实现相关，可能会在未来的版本中无通知地更改。要获取参数的最小值、最
     大值和默认值，请使用 --help=param -Q 选项。在每种情况下，值都是一个整数。
 
+**-ffunction-sections -fdata-sections** ::
+
+    如果目标平台支持任意节（section），则将每个函数或数据项放入输出文件中其各自独立的
+    节中。函数名或数据项名决定了输出文件中节的名称。在链接器能够进行优化以改善指令空间
+    引用局部性的系统上使用这些选项。大多数使用 ELF 对象格式的系统的链接器都具备此类优化
+    功能。在 AIX 系统上，链接器会根据调用图重新排列节（CSECTs），性能影响各不相同。
+
+    结合链接器的垃圾回收功能（链接器的 --gc-sections 选项），这些选项可能会使静态链接
+    的可执行文件在剥离符号后体积更小。在采用 ELF/DWARF 格式的系统上，这些选项不会降低
+    调试信息的质量，但对于其他对象文件/调试信息格式可能会存在问题。只有在能从中获得显著
+    好处时才使用这些选项。
+
+    当你指定这些选项时，汇编器和链接器会生成更大的目标文件和可执行文件，编译和链接处理
+    过程也会变慢。这些选项会影响代码生成，它们会阻碍编译器和汇编器利用翻译单元内的相对
+    位置进行优化，因为这些位置直到链接时才会确定。此类优化的一个例子是将普通调用放松为
+    短调用指令。
+
+    这两个选项主要用于控制目标文件中函数和数据的布局，会让编译器将每个函数放入输出文件
+    中其各自独立的节里，也就是说每个函数都会有一个专属的节，节的名称通常由函数名决定。
+    同理，第二个选项会使编译器将每个数据项（如全局变量、静态变量等）也放入输出文件中其
+    各自独立的节中，节的名称由数据项的名称确定。现代链接器（如大多数使用 ELF 对象格式的
+    系统中的链接器）具备优化功能，可根据程序实际使用情况移除未被引用的函数和数据。通过
+    结合使用 --gc-sections，链接器能够在链接过程中识别并丢弃那些未被使用的函数和数据
+    节。这一操作可以显著减小静态链接可执行文件的大小，特别是在程序包含大量未使用代码的
+    情况下。
+
+    在某些系统中，链接器可以根据函数和数据的调用关系对节进行重新排列，从而提高代码的局
+    部性引用。当程序运行时，CPU 能够更高效地从内存中获取所需的指令和数据，减少缓存缺
+    失，进而提升程序的执行性能。例如在 AIX 系统上，链接器会基于调用图对节进行重新排列。
+
+    编译器和汇编器通常会利用翻译单元内的相对位置进行一些优化，例如将普通调用转换为短调
+    用指令以提高执行效率。但使用这两个选项后，由于函数和数据的位置直到链接时才确定，这
+    些基于相对位置的优化将无法进行。综上所述，只有在能从减小可执行文件大小或提高代码局
+    部性引用等方面获得显著好处时，才建议使用这两个选项。
+
+**-faggressive-loop-optimizations** ::
+
+    此选项指示循环优化器利用语言约束条件来推导循环迭代次数的边界。这一做法基于这样的假
+    设：循环代码不会引发未定义行为，例如不会导致有符号整数溢出或数组越界访问等情况。循
+    环迭代次数的边界信息会被用于指导循环展开、循环剥离以及循环退出测试的优化。该选项默
+    认是启用状态。
+
+**-ftree-loop-distribute-patterns** ::
+
+    对那些可以通过调用库函数来生成代码的模式执行循环分发优化。此标志在使用 -O2 及更高优 
+    化级别时默认启用，在使用 -fprofile-use 和 -fauto-profile 选项时也会默认启用。该
+    优化过程会对初始化循环进行分发，并生成对 memset 函数（用于将内存块置零）的调用。例
+    如，对于如下循环：
+
+    DO I = 1, N
+        A(I) = 0
+        B(I) = A(I) + I
+    ENDDO
+
+    会被转换为：
+
+    DO I = 1, N
+        A(I) = 0
+    ENDDO
+    DO I = 1, N
+        B(I) = A(I) + I
+    ENDDO
+
+    并且初始化循环会被转换为对 memset 函数的调用，以更高效地将数组 A 的元素置零。这种
+    优化方式有助于提高代码的执行效率，尤其是在处理数组初始化等操作时，利用标准库函数 
+    memset 往往比手动编写循环进行赋值操作更快。
+
+**-fdelete-null-pointer-checks** ::
+
+    假定程序不会安全地解引用空指针，并且地址为零处不存在任何代码或数据元素。此选项在所
+    有优化级别下都能启用简单的常量折叠优化。此外，GCC 中的其他优化过程会使用该标志来控
+    制全局数据流分析，以消除对空指针的无用检查；这些分析假定对地址为零处的内存访问总会
+    导致陷阱，所以如果一个指针在已经被解引用之后又进行空指针检查，那么它不可能为空。
+
+    不过要注意，在某些环境中这个假定并不成立。对于依赖于对空指针进行检查这种行为的程
+    序，可以使用 -fno-delete-null-pointer-checks 来禁用此优化。
+
+    在大多数目标平台上，此选项默认是启用的。在 Nios II ELF 平台上，它默认是禁用的。在
+    AVR 和 MSP430 平台上，此选项完全不可用。利用数据流信息的优化过程在不同的优化级别下
+    会独立启用。
+
+**-fisolate-erroneous-paths-dereference** ::
+
+    检测那些由于解引用空指针而触发错误或未定义行为的代码路径。将这些路径与主控制流隔离
+    开来，并把会导致错误或未定义行为的语句转换为一个陷阱（trap）。在使用 -O2 及更高优
+    化级别时，该标志默认启用，并且启用了依赖的 -fdelete-null-pointer-checks 选项。
+
+**-fisolate-erroneous-paths-attribute** ::
+
+    检测那些由于以 returns_nonnull 或 nonnull 属性所禁止的方式使用空值而触发错误或未
+    定义行为的代码路径。将这些路径与主控制流隔离开来，并把会导致错误或未定义行为的语句
+    转换为一个陷阱。目前该选项未默认启用，但未来在 -O2 优化级别下可能会被启用。
+
+**-fstrict-aliasing** ::
+
+    允许编译器采用适用于所编译语言的最严格别名规则。对于 C 语言（以及 C++），这会激活
+    基于表达式类型的优化。具体而言，编译器假定一种类型的对象绝不会与不同类型的对象位于
+    同一地址，除非这两种类型几乎相同。例如 unsigned int 类型的对象可以与 int 类型的对
+    象产生别名关系，但不能与 void* 或 double 类型的对象产生别名关系。字符类型可以与任
+    何其他类型产生别名关系。
+
+    要特别留意类似下面这样的代码：
+
+    union a_union {
+        int i;
+        double d;
+    };
+    int f() {
+        union a_union t;
+        t.d = 3.0;
+        return t.i;
+    }
+
+    从联合中最近一次写入的成员之外的其他成员读取数据（这种操作称为“类型双关”）是很常见
+    的做法。即便使用了 -fstrict-aliasing 选项，只要是通过联合类型来访问内存，类型双关
+    操作就是被允许的。所以上面的代码能够按预期工作。然而下面这段代码可能无法正常工作：
+
+    int f() {
+        union a_union t;
+        int* ip;
+        t.d = 3.0;
+        ip = &t.i;
+        return *ip;
+    }
+
+    同样地，先取地址、对得到的指针进行类型转换，然后解引用转换后的指针这种访问方式会导
+    致未定义行为，即便类型转换使用了联合类型，例如：
+
+    int f() {
+        double d = 3.0;
+        return ((union a_union *) &d)->i;
+    }
+
+    该选项在 -O2、-O3、-Os 优化级别下会被启用。
+
+    别名（aliasing）指的是多个指针或引用指向同一块内存地址的情况。编译器在进行优化时，
+    需要考虑指针别名的可能性。-fstrict-aliasing 选项允许编译器采用适用于所编译语言的
+    最严格别名规则，以此为基础进行代码优化。对于 C 和 C++ 语言，启用
+    -fstrict-aliasing 会激活基于表达式类型的优化。编译器会做出如下假定：一般情况下，
+    不同类型的对象不会位于同一内存地址，除非这些类型非常相似。例如，unsigned int 和 
+    int 可以被认为是几乎相同的类型，所以它们的对象可能存在别名关系；但 int 和 void*、
+    double 等不同类型的对象通常不会存在别名关系。字符类型（如 char、signed char、
+    unsigned char）是个例外，它们可以与任何其他类型产生别名关系。
+
+    如果你的代码依赖于不同类型指针之间的别名关系，或者经常使用类型双关等操作，启用
+    -fstrict-aliasing 可能会导致代码出现未定义行为。在这种情况下，你可以使用
+    -fno-strict-aliasing 选项来禁用严格别名规则。
+
+**-fipa-strict-aliasing** ::
+
+    该选项控制是否将 -fstrict-aliasing 的规则应用到函数边界之外。需要注意的是，如果多
+    个函数被内联到一个函数中，那么这些内存访问就不再被视为跨越了函数边界。该选项默认是
+    启用的，并且只有与 -fstrict-aliasing 选项结合使用时才会生效。 
+
+**-fsingle-precision-constant** ::
+
+    该选项用于将浮点常量视为单精度（float 类型），而不是隐式地将它们转换为双精度
+    （double 类型）常量。在 C 和 C++ 等编程语言中，默认情况下，像 3.14 这样的浮点字面
+    量会被当作双精度常量处理。但当使用 -fsingle-precision-constant 选项编译代码时，
+    编译器会把这些浮点常量直接当作单精度常量处理，这样可能得到更快的处理。
+
 程序指令选项
 ------------
 
@@ -2854,11 +3124,11 @@ Optimization）的程序剖析信息。另一类程序插桩是添加运行时�
     -fno-jump-tables -fno-bit-tests
     -fverbose-asm -fstack-reuse=reuse_level
     -fcall-saved-reg -fcall-used-reg
-    -ffixed-reg -fexceptions
+    -ffixed-reg -fexceptions -fcommon
     -fnon-call-exceptions -fdelete-dead-exceptions -funwind-tables
     -fasynchronous-unwind-tables
     -fno-gnu-unique
-    -finhibit-size-directive -fcommon -fno-ident
+    -finhibit-size-directive -fno-ident
     -fpcc-struct-return -fpack-struct[=n]
     -frecord-gcc-switches
     -freg-struct-return -fshort-enums -fshort-wchar
@@ -2962,6 +3232,30 @@ Optimization）的程序剖析信息。另一类程序插桩是添加运行时�
     将名为 reg 的寄存器视为固定寄存器；生成的代码不应该引用它（除了作为栈指针、帧指针或
     某种固定角色使用）。接受的寄存器名称是机器特定的，并在机器描述宏文件中的
     REGISTER_NAMES 定义。此标志没有负形式，因为它指定了一个三选一的选择。
+
+**-fexceptions** ::
+
+    启用异常处理。生成传播异常所需的额外代码。对于某些目标平台，这意味着 GCC 会为所有函
+    数生成帧展开信息，这可能会导致显著的数据大小开销，不过它不会影响程序执行。如果你未
+    指定此选项，GCC 会为像 C++ 这类通常需要异常处理的语言默认启用该选项，而为像 C 这类
+    通常不需要异常处理的语言禁用该选项。不过，当你编译需要与用 C++ 编写的异常处理程序正
+    确交互的 C 代码时，可能需要启用此选项。如果你正在编译不使用异常处理的旧版 C++ 程
+    序，你可能也希望禁用此选项。
+
+**-fcommon** ::
+
+    在 C 代码中，此选项控制未带初始值设定项定义的全局变量（在 C 标准中称为暂定定义）的 
+    放置位置。暂定定义与使用 extern 关键字进行的变量声明不同，后者并不分配存储空间。
+
+    默认选项是 -fno-common，它指定编译器将未初始化的全局变量放置在目标文件的 BSS 段
+    中。这样可以防止链接器合并暂定定义，因此如果同一个变量在多个编译单元中被意外定义，
+    你会得到多重定义错误。因此 -fno-common 可以防止在多个文件中重复定义同一个未初始化
+    的变量。
+
+    -fcommon 选项会将未初始化的全局变量放置在公共块中。这使得链接器可以将不同编译单元
+    中同一变量的所有暂定定义解析为同一个对象，或者解析为一个非暂定定义。这种行为与 C++
+    不一致，并且在许多目标平台上，这意味着对全局变量的引用会有速度和代码大小方面的代
+    价。该选项主要用于让遗留代码能够无错误地进行链接。
 
 开发者选项
 -----------
