@@ -1481,7 +1481,7 @@ C++ 源文件通常使用以下后缀之一：.C、.cc、.cpp、.CPP、.c++、.c
 这些选项指定用于头文件、库文件以及编译器自身目录的搜索： ::
 
     -Idir -iquote dir -isystem dir -idirafter dir
-    -I- -iprefix file -iwithprefixbefore dir -iwithprefix dir
+    -I- -iprefix prefix -iwithprefixbefore dir -iwithprefix dir
     --sysroot=dir -isysroot dir
     -nostdinc -nostdinc++ -imultilib dir
     -Ldir -Bprefix -iplugindir=dir
@@ -3812,6 +3812,7 @@ X86 选项汇总： ::
     -mlarge-data-threshold=threshold
     -mcmodel=small|kernel|medium|large
     -maddress-mode=long|short
+    -mgeneral-regs-only 
     -m80387 -m8bit-idiv -msha -msha512 -maes
     -mfpmath=unit -mno-fancy-math-387
     -mno-fp-ret-in-387 -mhard-float -msoft-float
@@ -3849,7 +3850,7 @@ X86 选项汇总： ::
     -msse2avx -mfentry -mrecord-mcount -mnop-mcount
     -minstrument-return=type -mfentry-name=name -mfentry-section=name
     -mavx256-split-unaligned-load -mavx256-split-unaligned-store
-    -mgeneral-regs-only -mcall-ms2sysv-xlogues -mrelax-cmpxchg-loop
+    -mcall-ms2sysv-xlogues -mrelax-cmpxchg-loop
     -mindirect-branch=choice -mfunction-return=choice
     -mindirect-branch-register -mharden-sls=choice
     -mindirect-branch-cs-prefix -mneeded -mno-direct-extern-access
@@ -3867,12 +3868,17 @@ X86 选项汇总： ::
     在 16 位模式下运行。-miamcu 选项生成符合 Intel MCU psABI 的代码。它需要启用 -m32
     选项。
 
+    -m16    Generate 16bit i386 code.
+    -m32    Generate 32bit i386 code.
+    -m64    Generate 64bit x86-64 code.
+    -mx32   Generate 32bit x86-64 code.
+
 **-march=cpu-type** ::
 
-    为指定的机器类型 cpu-type 生成指令。与 -mtune=cpu-type 不同，后者仅针对指定的
+    为指定的机器类型 cpu-type 生成代码。与 -mtune=cpu-type 不同，后者仅针对指定的
     cpu-type 调整生成的代码，-march=cpu-type 允许 GCC 生成可能无法在除指定处理器之外
-    的其他处理器上运行的代码。指定 -march=cpu-type 意味着 -mtune=cpu-type，除非另有
-    说明。cpu-type 的选择包括：
+    的其他处理器上运行的代码。指定 -march=cpu-type 会打开 -mtune=cpu-type，除非另有
+    设定。cpu-type 的选择包括：
 
     native：在编译时选择要为其生成代码的 CPU，通过确定正在编译的机器的处理器类型来实
     现。使用 -march=native 可启用本地机器支持的所有指令子集（因此结果可能无法在不同机
@@ -4148,22 +4154,23 @@ X86 选项汇总： ::
 **-mcmodel=small** ::
 
     为小型代码模型生成代码：程序及其符号必须链接到地址空间的低 2GB 中。指针是 64 位。
-    程序可以静态或动态链接。这是默认代码模型。
+    程序可以静态或动态链接。这是默认代码模型。指定x86-64代码模型，不能用于m32模式。
 
 **-mcmodel=kernel** ::
 
     为内核代码模型生成代码。内核运行在地址空间的负 2GB 中。此模型必须用于 Linux 内核代
-    码。
+    码。指定x86-64代码模型，不能用于m32位模式。
 
 **-mcmodel=medium** ::
 
     为中型模型生成代码：程序链接到地址空间的低 2GB 中。小符号也放置在那里。大小大于
     -mlarge-data-threshold 的符号被放入大数据或 BSS 段中，可以位于 2GB 以上。程序可
-    以静态或动态链接。
+    以静态或动态链接。指定x86-64代码模型，不能用于m32位模式。
 
 **-mcmodel=large** ::
 
-    为大型模型生成代码。此模型不对段的地址和大小做任何假设。
+    为大型模型生成代码。此模型不对段的地址和大小做任何假设。指定x86-64代码模型，不能用
+    于m32位模式。
 
 **-maddress-mode=long** ::
 
@@ -4173,6 +4180,11 @@ X86 选项汇总： ::
 
     为短地址模式生成代码。这仅支持 32 位和 x32 环境。它是 32 位和 x32 环境的默认地址
     模式。
+
+**-mgeneral-regs-only** ::
+
+    仅使用通用寄存器生成代码，禁止编译器使用浮点寄存器、向量寄存器、掩码寄存器以及边界
+    寄存器（mask and bound registers）。
 
 AArch64 选项
 -------------
