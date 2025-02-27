@@ -319,6 +319,97 @@ CPU 在进入函数之前必须是 x87 模式。因此每个用了 MMX 寄存器
 改了它的值在返回之前必须进行恢复。媒体控制和状态寄存器mxcsr的控制位，也由被调函数保护可
 以跨函数。线程指针（thread pointer）%fs寄存器也需要保护。
 
+X87浮点控制字（Control Word）和状态字（Status Word）寄存器： ::
+
+    Control Word (16-bit) - FSTCW/FNSTCW FLDCW
+    [00] IM - Invalid Operation
+    [01] DM - Denormal Operand
+    [02] ZM - Zero Divide
+    [03] OM - Overflow
+    [04] UM - Underflow
+    [05] PM - Precision
+    [06] RSV- Reserved
+    [07] RSV- Reserved
+    [08] PC - Precision Control bit0
+    [09] PC - Precision Control bit1
+    [10] RC - Rounding Control bit0
+    [11] RC - Rounding Control bit1
+    [12] X  - Infinity Control
+    [13~15] - Reserved
+
+    fstcw：在执行保存操作之前，fstcw 会检查 FPU 的状态寄存器，查看是否有未处理的异常。
+    如果存在未处理的异常，它会触发相应的异常处理程序，程序的执行流程会被打断，跳转到异
+    常处理代码处执行。只有当 FPU 没有未处理的异常时，才会将控制字保存到指定内存。
+
+    fstcw 相当于 fwait + fnstcw。wait/fwait 指令是同步指令（实际上它们是同一操作码的
+    不同助记符）。这些指令会检查 x87 浮点运算单元（FPU）的状态字，以查看是否存在未屏蔽
+    的待处理 x87 FPU 异常。如果发现任何未屏蔽的待处理 x87 FPU 异常，处理器会先处理这
+    些异常，然后再继续执行指令流中的指令（整数指令、浮点指令或系统指令）。提供
+    wait/fwait 指令是为了实现 x87 FPU 和处理器整数单元之间的指令执行同步。
+
+    当一个浮点异常未被屏蔽且异常条件发生时，x87 浮点运算单元（FPU）会停止进一步执行浮
+    点指令，并发出异常事件信号。当指令流中接下来出现浮点指令或 WAIT/FWAIT 指令时，处理
+    器会检查 x87 FPU 状态字中的 ES（Error Summary，错误汇总）标志，以查看是否有待处理
+    的浮点异常。如果存在待处理的浮点异常，x87 FPU 会隐式调用（陷入）浮点软件异常处理程
+    序。然后，异常处理程序可以针对选定的或所有浮点异常执行恢复程序。
+
+    fnstcw：无论 FPU 中是否存在未处理的异常，fnstcw 都会直接将控制字保存到指定内存，
+    不会触发异常检查和处理机制。这意味着即使 FPU 处于异常状态，该指令也能正常执行保存操
+    作，不会因为异常而中断。
+
+    Status Word (16-bit) - FSTSW/FNSTSW/FXSAVE FLDSW/FXRSTOR
+    [00] IE - Invalid Operation
+    [01] DE - Denormalized Operand
+    [02] ZE - Zero Divide
+    [03] OE - Overflow
+    [04] UE - Underflow
+    [05] PE - Precision
+    [06] SF - Stack Fault Exception Flags
+    [07] ES - Exception Summary Status
+    [08] C0 - Condition Code 0
+    [09] C1 - Condition Code 1
+    [10] C2 - Condition Code 2
+    [11] TOP- Top of Stack Pointer bit0
+    [12] TOP- Top of Stack Pointer bit1
+    [13] TOP- Top of Stack Pointer bit2
+    [14] C3 - Condition Code 3
+    [15] B  - FPU Busy
+
+媒体控制和状态寄存器 MXCSR： ::
+
+    The floating point control word and bit 6-15 of the MXCSR register must be
+    saved and restored before any call or return by any procedure that needs
+    to modify them, except for procedures that have the purpose of changing
+    these.
+
+    32-bit MXCSR Control/Status Register - STMXCSR LDMXCSR
+    [00] IE - Invalid Operation FLag
+    [01] DE - Denormal Flag
+    [02] ZE - Divide-by-Zero Flag
+    [03] OE - Overflow Flag
+    [04] UE - Underflow Flag
+    [05] PE - Precision Flag
+    [06] DAZ- Denormals Are Zeros, enable the denormals-are-zeros mode
+    [07] IM - Invalid Operation Mask, set 1 to mask IE let dont gen IE exception
+    [08] DM - Denormal Operation Mask, set 1 to mask out DE
+    [09] ZM - Divide-by-Zero Mask, set 1 to mask out ZE
+    [10] OM - Overflow Mask, set 1 to mask out OE
+    [11] UM - Underflow Mask, set 1 to mask out UE
+    [12] PM - Precision Mask, set 1 to mask out PE
+    [13] RC - Rounding Control bit0
+    [14] RC - Rounding Control bit1
+    [15] FTZ- Flush to Zero, enable flush to zero mode
+    [16~31] - Reserved
+
+    If a (V)LDMXCSR instruction clears a SIMD floating-point exception mask
+    bit and sets the corresponding exception flag bit, a SIMD floating-point
+    exception will not be immediately generated. The exception will be
+    generated only upon the execution of the next instruction that meets
+    both conditions below: • the instruction must operate on an XMM or YMM
+    register operand, • the instruction causes that particular SIMD
+    floating-point exception to be reported. This instruction’s operation is
+    the same in non-64-bit modes and 64-bit mode.
+
 用来传递参数的临时寄存器： ::
 
     整型寄存器
